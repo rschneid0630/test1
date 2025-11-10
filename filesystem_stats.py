@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Filesystem Statistics Tool
-Provides comprehensive statistics about a filesystem or directory.
+Provides comprehensive statistics about a filesystem or directory with visualizations.
 """
 
 import os
@@ -11,6 +11,19 @@ from pathlib import Path
 from collections import defaultdict, Counter
 from datetime import datetime
 import shutil
+import base64
+from io import BytesIO
+
+try:
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as mpatches
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+    print("Warning: matplotlib not available. Install with: pip install matplotlib")
+    print("Continuing with text-only output...\n")
 
 
 class FilesystemStats:
@@ -242,6 +255,520 @@ class FilesystemStats:
 
         print("=" * 80)
 
+    def create_visualizations(self):
+        """Create visualization charts and return them as base64 encoded images."""
+        if not MATPLOTLIB_AVAILABLE:
+            return {}
+
+        charts = {}
+
+        # Set a professional style
+        plt.style.use('seaborn-v0_8-darkgrid' if 'seaborn-v0_8-darkgrid' in plt.style.available else 'default')
+
+        # 1. File Type Distribution (Pie Chart)
+        if self.file_types:
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            # Get top 10 file types and group the rest as "Others"
+            top_types = dict(self.file_types.most_common(10))
+            other_count = sum(count for ext, count in self.file_types.items() if ext not in top_types)
+
+            if other_count > 0:
+                top_types['Others'] = other_count
+
+            colors = plt.cm.Set3(range(len(top_types)))
+            wedges, texts, autotexts = ax.pie(
+                top_types.values(),
+                labels=top_types.keys(),
+                autopct='%1.1f%%',
+                colors=colors,
+                startangle=90
+            )
+
+            # Make percentage text more readable
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(10)
+
+            ax.set_title('File Type Distribution', fontsize=16, fontweight='bold', pad=20)
+            plt.tight_layout()
+
+            # Convert to base64
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            charts['file_types'] = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+
+        # 2. File Size Distribution (Bar Chart)
+        if self.size_distribution:
+            fig, ax = plt.subplots(figsize=(12, 6))
+
+            size_order = ["0 B (empty)", "< 1 KB", "1 KB - 1 MB", "1 MB - 10 MB",
+                         "10 MB - 100 MB", "100 MB - 1 GB", "> 1 GB"]
+
+            categories = [cat for cat in size_order if cat in self.size_distribution]
+            counts = [self.size_distribution[cat] for cat in categories]
+
+            bars = ax.bar(range(len(categories)), counts, color='steelblue', alpha=0.8)
+            ax.set_xlabel('File Size Category', fontsize=12, fontweight='bold')
+            ax.set_ylabel('Number of Files', fontsize=12, fontweight='bold')
+            ax.set_title('File Size Distribution', fontsize=16, fontweight='bold', pad=20)
+            ax.set_xticks(range(len(categories)))
+            ax.set_xticklabels(categories, rotation=45, ha='right')
+
+            # Add value labels on bars
+            for bar in bars:
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{int(height):,}',
+                       ha='center', va='bottom', fontsize=9)
+
+            ax.grid(axis='y', alpha=0.3)
+            plt.tight_layout()
+
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            charts['size_distribution'] = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+
+        # 3. Largest Files (Horizontal Bar Chart)
+        if self.largest_files:
+            fig, ax = plt.subplots(figsize=(12, 8))
+
+            files_to_show = min(15, len(self.largest_files))
+            files = self.largest_files[:files_to_show]
+
+            names = [Path(f[0]).name if len(Path(f[0]).name) < 30
+                    else Path(f[0]).name[:27] + '...' for f in files]
+            sizes_mb = [f[1] / (1024 * 1024) for f in files]  # Convert to MB
+
+            y_pos = range(len(names))
+            bars = ax.barh(y_pos, sizes_mb, color='coral', alpha=0.8)
+
+            ax.set_yticks(y_pos)
+            ax.set_yticklabels(names)
+            ax.invert_yaxis()
+            ax.set_xlabel('File Size (MB)', fontsize=12, fontweight='bold')
+            ax.set_title('Largest Files', fontsize=16, fontweight='bold', pad=20)
+
+            # Add value labels
+            for i, bar in enumerate(bars):
+                width = bar.get_width()
+                ax.text(width, bar.get_y() + bar.get_height()/2.,
+                       f'{sizes_mb[i]:.2f} MB',
+                       ha='left', va='center', fontsize=9, style='italic')
+
+            ax.grid(axis='x', alpha=0.3)
+            plt.tight_layout()
+
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            charts['largest_files'] = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+
+        # 4. File Count and Directory Count (Comparison Bar Chart)
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        categories = ['Total Files', 'Total Directories', 'Hidden Files', 'Hidden Directories']
+        counts = [self.total_files, self.total_dirs, self.hidden_files, self.hidden_dirs]
+        colors_list = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
+
+        bars = ax.bar(categories, counts, color=colors_list, alpha=0.8)
+        ax.set_ylabel('Count', fontsize=12, fontweight='bold')
+        ax.set_title('File and Directory Statistics', fontsize=16, fontweight='bold', pad=20)
+        ax.set_xticks(range(len(categories)))
+        ax.set_xticklabels(categories, rotation=15, ha='right')
+
+        # Add value labels
+        for bar in bars:
+            height = bar.get_height()
+            ax.text(bar.get_x() + bar.get_width()/2., height,
+                   f'{int(height):,}',
+                   ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+        ax.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        charts['file_dir_stats'] = base64.b64encode(buf.read()).decode('utf-8')
+        plt.close()
+
+        # 5. Disk Usage (if available)
+        try:
+            disk_usage = shutil.disk_usage(self.root_path)
+            fig, ax = plt.subplots(figsize=(10, 6))
+
+            used_gb = disk_usage.used / (1024**3)
+            free_gb = disk_usage.free / (1024**3)
+
+            categories = ['Used Space', 'Free Space']
+            sizes = [used_gb, free_gb]
+            colors_disk = ['#e74c3c', '#2ecc71']
+
+            wedges, texts, autotexts = ax.pie(
+                sizes,
+                labels=categories,
+                autopct='%1.1f%%',
+                colors=colors_disk,
+                startangle=90
+            )
+
+            for autotext in autotexts:
+                autotext.set_color('white')
+                autotext.set_fontweight('bold')
+                autotext.set_fontsize(12)
+
+            ax.set_title(f'Disk Usage (Total: {disk_usage.total / (1024**3):.2f} GB)',
+                        fontsize=16, fontweight='bold', pad=20)
+            plt.tight_layout()
+
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            charts['disk_usage'] = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+        except:
+            pass
+
+        return charts
+
+    def generate_html_report(self, output_file='filesystem_report.html'):
+        """Generate an HTML report with embedded charts."""
+        charts = self.create_visualizations()
+
+        html_content = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filesystem Statistics Report</title>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }}
+
+        .container {{
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }}
+
+        .header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }}
+
+        .header h1 {{
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }}
+
+        .header .subtitle {{
+            font-size: 1.1em;
+            opacity: 0.9;
+        }}
+
+        .content {{
+            padding: 40px;
+        }}
+
+        .stats-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }}
+
+        .stat-card {{
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }}
+
+        .stat-card:hover {{
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }}
+
+        .stat-card h3 {{
+            color: #667eea;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }}
+
+        .stat-card .value {{
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+        }}
+
+        .section {{
+            margin-bottom: 50px;
+        }}
+
+        .section h2 {{
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }}
+
+        .chart-container {{
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }}
+
+        .chart-container img {{
+            width: 100%;
+            height: auto;
+            border-radius: 5px;
+        }}
+
+        .info-table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }}
+
+        .info-table th {{
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }}
+
+        .info-table td {{
+            padding: 12px 15px;
+            border-bottom: 1px solid #e9ecef;
+        }}
+
+        .info-table tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        .info-table tr:hover {{
+            background: #f8f9fa;
+        }}
+
+        .footer {{
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }}
+
+        .badge {{
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+            background: #667eea;
+            color: white;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Filesystem Statistics Report</h1>
+            <div class="subtitle">
+                <strong>Root Path:</strong> {self.root_path}<br>
+                <strong>Generated:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Summary Statistics -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Files</h3>
+                    <div class="value">{self.total_files:,}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Directories</h3>
+                    <div class="value">{self.total_dirs:,}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Size</h3>
+                    <div class="value">{self.format_size(self.total_size)}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Average File Size</h3>
+                    <div class="value">{self.format_size(self.total_size / self.total_files) if self.total_files > 0 else "N/A"}</div>
+                </div>
+            </div>
+"""
+
+        # Add charts
+        if MATPLOTLIB_AVAILABLE and charts:
+            html_content += """
+            <div class="section">
+                <h2>📈 Visual Analytics</h2>
+"""
+
+            if 'disk_usage' in charts:
+                html_content += f"""
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 15px; color: #333;">Disk Usage Overview</h3>
+                    <img src="data:image/png;base64,{charts['disk_usage']}" alt="Disk Usage">
+                </div>
+"""
+
+            if 'file_dir_stats' in charts:
+                html_content += f"""
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 15px; color: #333;">File and Directory Statistics</h3>
+                    <img src="data:image/png;base64,{charts['file_dir_stats']}" alt="File and Directory Stats">
+                </div>
+"""
+
+            if 'file_types' in charts:
+                html_content += f"""
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 15px; color: #333;">File Type Distribution</h3>
+                    <img src="data:image/png;base64,{charts['file_types']}" alt="File Type Distribution">
+                </div>
+"""
+
+            if 'size_distribution' in charts:
+                html_content += f"""
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 15px; color: #333;">File Size Distribution</h3>
+                    <img src="data:image/png;base64,{charts['size_distribution']}" alt="Size Distribution">
+                </div>
+"""
+
+            if 'largest_files' in charts:
+                html_content += f"""
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 15px; color: #333;">Largest Files</h3>
+                    <img src="data:image/png;base64,{charts['largest_files']}" alt="Largest Files">
+                </div>
+"""
+
+            html_content += """
+            </div>
+"""
+
+        # Add file type table
+        if self.file_types:
+            html_content += """
+            <div class="section">
+                <h2>📄 File Type Details</h2>
+                <table class="info-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>File Extension</th>
+                            <th>Count</th>
+                            <th>Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+            for i, (ext, count) in enumerate(self.file_types.most_common(20), 1):
+                percentage = (count / self.total_files) * 100
+                html_content += f"""
+                        <tr>
+                            <td><span class="badge">{i}</span></td>
+                            <td><strong>{ext}</strong></td>
+                            <td>{count:,}</td>
+                            <td>{percentage:.2f}%</td>
+                        </tr>
+"""
+            html_content += """
+                    </tbody>
+                </table>
+            </div>
+"""
+
+        # Add largest files table
+        if self.largest_files:
+            html_content += """
+            <div class="section">
+                <h2>🗂️ Largest Files</h2>
+                <table class="info-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>File Path</th>
+                            <th>Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+"""
+            for i, (filepath, size) in enumerate(self.largest_files[:20], 1):
+                try:
+                    rel_path = Path(filepath).relative_to(self.root_path)
+                except:
+                    rel_path = filepath
+                html_content += f"""
+                        <tr>
+                            <td><span class="badge">{i}</span></td>
+                            <td><code>{rel_path}</code></td>
+                            <td><strong>{self.format_size(size)}</strong></td>
+                        </tr>
+"""
+            html_content += """
+                    </tbody>
+                </table>
+            </div>
+"""
+
+        html_content += """
+        </div>
+
+        <div class="footer">
+            Generated by Filesystem Statistics Tool |
+            <strong>Python</strong> with <strong>Matplotlib</strong>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+        # Write HTML file
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
+        return output_file
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -249,11 +776,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s                          # Scan current directory
-  %(prog)s /path/to/directory       # Scan specific directory
-  %(prog)s -v                       # Verbose output with more details
-  %(prog)s --max-depth 3            # Limit scan depth
-  %(prog)s --follow-symlinks        # Follow symbolic links
+  %(prog)s                                    # Scan current directory
+  %(prog)s /path/to/directory                 # Scan specific directory
+  %(prog)s -v                                 # Verbose output with more details
+  %(prog)s --max-depth 3                      # Limit scan depth
+  %(prog)s --html report.html                 # Generate HTML report with charts
+  %(prog)s --save-charts ./charts             # Save individual chart images
+  %(prog)s --html report.html -v              # HTML report with verbose data
+  %(prog)s /home --html home_stats.html       # Scan /home and create HTML report
         """
     )
 
@@ -283,6 +813,18 @@ Examples:
         help='Follow symbolic links (may cause infinite loops)'
     )
 
+    parser.add_argument(
+        '--html',
+        metavar='FILE',
+        help='Generate HTML report with charts (e.g., report.html)'
+    )
+
+    parser.add_argument(
+        '--save-charts',
+        metavar='DIR',
+        help='Save individual chart images to directory'
+    )
+
     args = parser.parse_args()
 
     # Validate path
@@ -300,11 +842,45 @@ Examples:
         stats = FilesystemStats(args.path)
         stats.scan_directory(max_depth=args.max_depth, follow_symlinks=args.follow_symlinks)
         stats.print_report(verbose=args.verbose)
+
+        # Generate HTML report if requested
+        if args.html:
+            if not MATPLOTLIB_AVAILABLE:
+                print("\nWarning: Cannot generate HTML report without matplotlib", file=sys.stderr)
+                print("Install with: pip install matplotlib", file=sys.stderr)
+            else:
+                print(f"\nGenerating HTML report...")
+                output_file = stats.generate_html_report(args.html)
+                print(f"HTML report saved to: {output_file}")
+
+        # Save individual charts if requested
+        if args.save_charts:
+            if not MATPLOTLIB_AVAILABLE:
+                print("\nWarning: Cannot save charts without matplotlib", file=sys.stderr)
+                print("Install with: pip install matplotlib", file=sys.stderr)
+            else:
+                import os
+                chart_dir = Path(args.save_charts)
+                chart_dir.mkdir(parents=True, exist_ok=True)
+
+                print(f"\nGenerating and saving charts to {chart_dir}...")
+                charts = stats.create_visualizations()
+
+                for chart_name, chart_data in charts.items():
+                    chart_path = chart_dir / f"{chart_name}.png"
+                    with open(chart_path, 'wb') as f:
+                        f.write(base64.b64decode(chart_data))
+                    print(f"  Saved: {chart_path}")
+
+                print(f"Charts saved successfully!")
+
     except KeyboardInterrupt:
         print("\n\nScan interrupted by user", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
         print(f"\nError: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
