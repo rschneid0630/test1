@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Database Query Tool</title>
+    <HTA:APPLICATION
+        ID="DBQueryTool"
+        APPLICATIONNAME="Database Query Tool"
+        BORDER="thick"
+        BORDERSTYLE="normal"
+        CAPTION="yes"
+        MAXIMIZEBUTTON="yes"
+        MINIMIZEBUTTON="yes"
+        SHOWINTASKBAR="yes"
+        SINGLEINSTANCE="no"
+        SYSMENU="yes"
+        WINDOWSTATE="normal"
+        SCROLL="auto"
+        SCROLLFLAT="yes"
+        VERSION="1.0"
+    />
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+            border-bottom: 2px solid #0078d4;
+            padding-bottom: 10px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .panel h2 {
+            margin-top: 0;
+            color: #0078d4;
+            font-size: 16px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        input[type="text"], select, textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        input[type="text"]:focus, select:focus, textarea:focus {
+            border-color: #0078d4;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+        }
+        textarea {
+            font-family: 'Consolas', 'Courier New', monospace;
+            min-height: 120px;
+            resize: vertical;
+        }
+        .row {
+            display: flex;
+            gap: 15px;
+        }
+        .row > div {
+            flex: 1;
+        }
+        .row-3 > div {
+            flex: 1;
+        }
+        button {
+            background: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #106ebe;
+        }
+        button.secondary {
+            background: #6c757d;
+        }
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        button.success {
+            background: #28a745;
+        }
+        button.success:hover {
+            background: #218838;
+        }
+        #results {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        #results th {
+            background: #0078d4;
+            color: white;
+            padding: 10px 8px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+        #results td {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        #results tr:hover {
+            background: #f8f9fa;
+        }
+        #results tr:nth-child(even) {
+            background: #fafafa;
+        }
+        #results tr:nth-child(even):hover {
+            background: #f0f0f0;
+        }
+        .results-container {
+            max-height: 500px;
+            overflow: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        .status.info {
+            background: #cce5ff;
+            color: #004085;
+            border: 1px solid #b8daff;
+            display: block;
+        }
+        .saved-queries {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .saved-query-btn {
+            background: #e9ecef;
+            color: #495057;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .saved-query-btn:hover {
+            background: #dee2e6;
+        }
+        .summary {
+            color: #666;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            margin-bottom: -1px;
+            background: #f8f9fa;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab:hover {
+            background: #e9ecef;
+        }
+        .tab.active {
+            background: white;
+            border-color: #ddd;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Database Query Tool</h1>
+
+        <div class="panel">
+            <h2>Connection Settings</h2>
+            <div class="row">
+                <div>
+                    <label>Server:</label>
+                    <input type="text" id="server" value="p-budg-w-db19" />
+                </div>
+                <div>
+                    <label>Port:</label>
+                    <input type="text" id="port" value="1433" />
+                </div>
+                <div>
+                    <label>Database:</label>
+                    <input type="text" id="database" value="budg" />
+                </div>
+                <div>
+                    <label>Authentication:</label>
+                    <select id="authType">
+                        <option value="windows" selected>Windows Authentication</option>
+                        <option value="sql">SQL Server Authentication</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row" id="sqlAuthRow" style="display:none;">
+                <div>
+                    <label>Username:</label>
+                    <input type="text" id="username" />
+                </div>
+                <div>
+                    <label>Password:</label>
+                    <input type="text" id="password" />
+                </div>
+            </div>
+            <button onclick="testConnection()" class="success">Test Connection</button>
+        </div>
+
+        <div class="panel">
+            <h2>Saved Queries</h2>
+            <div class="saved-queries" id="savedQueries">
+                <button class="saved-query-btn" onclick="loadQuery('budg_sum')">Budget FY2026 Sum</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>SQL Query</h2>
+            <textarea id="query" placeholder="Enter your SQL query here...">SELECT SUM(m.NetAmount) AS TotalNetAmount
+FROM eis.RD_REPORTING_2026 m
+WHERE m.BudgFy = '2026'
+AND m.fundingCode = '01002627DB'</textarea>
+            <button onclick="executeQuery()">Execute Query</button>
+            <button onclick="clearResults()" class="secondary">Clear Results</button>
+            <button onclick="exportCSV()" class="secondary">Export to CSV</button>
+        </div>
+
+        <div id="statusMessage" class="status"></div>
+
+        <div class="panel">
+            <h2>Results</h2>
+            <div class="results-container">
+                <table id="results">
+                    <thead id="resultsHeader"></thead>
+                    <tbody id="resultsBody"></tbody>
+                </table>
+            </div>
+            <div class="summary" id="summary"></div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        var lastResults = [];
+        var lastColumns = [];
+
+        // Saved queries
+        var savedQueries = {
+            'budg_sum': "SELECT SUM(m.NetAmount) AS TotalNetAmount \nFROM eis.RD_REPORTING_2026 m \nWHERE m.BudgFy = '2026' \nAND m.fundingCode = '01002627DB'"
+        };
+
+        // Toggle SQL auth fields
+        document.getElementById('authType').onchange = function() {
+            var sqlAuthRow = document.getElementById('sqlAuthRow');
+            sqlAuthRow.style.display = this.value === 'sql' ? 'flex' : 'none';
+        };
+
+        function loadQuery(name) {
+            if (savedQueries[name]) {
+                document.getElementById('query').value = savedQueries[name];
+            }
+        }
+
+        function showStatus(message, type) {
+            var status = document.getElementById('statusMessage');
+            status.className = 'status ' + type;
+            status.innerHTML = message;
+        }
+
+        function hideStatus() {
+            document.getElementById('statusMessage').className = 'status';
+        }
+
+        function getConnectionString() {
+            var server = document.getElementById('server').value;
+            var port = document.getElementById('port').value;
+            var database = document.getElementById('database').value;
+            var authType = document.getElementById('authType').value;
+
+            var connStr = "Provider=SQLOLEDB;Data Source=" + server + "," + port + ";Initial Catalog=" + database + ";";
+
+            if (authType === 'windows') {
+                connStr += "Integrated Security=SSPI;";
+            } else {
+                var username = document.getElementById('username').value;
+                var password = document.getElementById('password').value;
+                connStr += "User ID=" + username + ";Password=" + password + ";";
+            }
+
+            return connStr;
+        }
+
+        function testConnection() {
+            hideStatus();
+            try {
+                var conn = new ActiveXObject("ADODB.Connection");
+                conn.ConnectionTimeout = 10;
+                conn.Open(getConnectionString());
+                conn.Close();
+                showStatus("Connection successful!", "success");
+            } catch (e) {
+                showStatus("Connection failed: " + e.message, "error");
+            }
+        }
+
+        function executeQuery() {
+            hideStatus();
+            var query = document.getElementById('query').value;
+
+            if (!query.trim()) {
+                showStatus("Please enter a SQL query.", "error");
+                return;
+            }
+
+            var startTime = new Date();
+
+            try {
+                var conn = new ActiveXObject("ADODB.Connection");
+                conn.ConnectionTimeout = 30;
+                conn.CommandTimeout = 300;
+                conn.Open(getConnectionString());
+
+                var rs = new ActiveXObject("ADODB.Recordset");
+                rs.Open(query, conn);
+
+                lastResults = [];
+                lastColumns = [];
+
+                // Get column names
+                if (!rs.EOF) {
+                    for (var i = 0; i < rs.Fields.Count; i++) {
+                        lastColumns.push(rs.Fields(i).Name);
+                    }
+                }
+
+                // Get data
+                while (!rs.EOF) {
+                    var row = {};
+                    for (var i = 0; i < rs.Fields.Count; i++) {
+                        var val = rs.Fields(i).Value;
+                        row[rs.Fields(i).Name] = (val === null || val === undefined) ? null : val;
+                    }
+                    lastResults.push(row);
+                    rs.MoveNext();
+                }
+
+                rs.Close();
+                conn.Close();
+
+                var endTime = new Date();
+                var duration = (endTime - startTime) / 1000;
+
+                displayResults();
+                showStatus("Query executed successfully in " + duration.toFixed(2) + " seconds.", "success");
+                document.getElementById('summary').innerHTML = "Rows returned: " + lastResults.length;
+
+            } catch (e) {
+                showStatus("Error: " + e.message, "error");
+            }
+        }
+
+        function displayResults() {
+            var headerEl = document.getElementById('resultsHeader');
+            var bodyEl = document.getElementById('resultsBody');
+
+            headerEl.innerHTML = '';
+            bodyEl.innerHTML = '';
+
+            if (lastColumns.length === 0) {
+                bodyEl.innerHTML = '<tr><td>No results</td></tr>';
+                return;
+            }
+
+            // Header
+            var headerRow = '<tr>';
+            for (var i = 0; i < lastColumns.length; i++) {
+                headerRow += '<th>' + escapeHtml(lastColumns[i]) + '</th>';
+            }
+            headerRow += '</tr>';
+            headerEl.innerHTML = headerRow;
+
+            // Data rows
+            var html = '';
+            for (var r = 0; r < lastResults.length; r++) {
+                html += '<tr>';
+                for (var c = 0; c < lastColumns.length; c++) {
+                    var val = lastResults[r][lastColumns[c]];
+                    var displayVal = formatValue(val);
+                    html += '<td>' + escapeHtml(displayVal) + '</td>';
+                }
+                html += '</tr>';
+            }
+            bodyEl.innerHTML = html;
+        }
+
+        function formatValue(val) {
+            if (val === null || val === undefined) {
+                return 'NULL';
+            }
+            if (typeof val === 'number') {
+                if (Math.abs(val) >= 1000) {
+                    return val.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                }
+                return val.toString();
+            }
+            return val.toString();
+        }
+
+        function escapeHtml(text) {
+            if (text === null || text === undefined) return '';
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text.toString()));
+            return div.innerHTML;
+        }
+
+        function clearResults() {
+            document.getElementById('resultsHeader').innerHTML = '';
+            document.getElementById('resultsBody').innerHTML = '';
+            document.getElementById('summary').innerHTML = '';
+            hideStatus();
+            lastResults = [];
+            lastColumns = [];
+        }
+
+        function exportCSV() {
+            if (lastResults.length === 0) {
+                showStatus("No results to export.", "error");
+                return;
+            }
+
+            var csv = lastColumns.map(function(c) { return '"' + c.replace(/"/g, '""') + '"'; }).join(',') + '\n';
+
+            for (var r = 0; r < lastResults.length; r++) {
+                var row = [];
+                for (var c = 0; c < lastColumns.length; c++) {
+                    var val = lastResults[r][lastColumns[c]];
+                    if (val === null || val === undefined) {
+                        row.push('');
+                    } else if (typeof val === 'string') {
+                        row.push('"' + val.replace(/"/g, '""') + '"');
+                    } else {
+                        row.push(val.toString());
+                    }
+                }
+                csv += row.join(',') + '\n';
+            }
+
+            // Save to file
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var desktop = new ActiveXObject("WScript.Shell").SpecialFolders("Desktop");
+                var filename = desktop + "\\query_results_" + new Date().getTime() + ".csv";
+                var file = fso.CreateTextFile(filename, true);
+                file.Write(csv);
+                file.Close();
+                showStatus("Exported to: " + filename, "success");
+            } catch (e) {
+                showStatus("Export failed: " + e.message, "error");
+            }
+        }
+    </script>
+</body>
+</html>
