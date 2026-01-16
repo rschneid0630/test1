@@ -1,0 +1,7 @@
+# Database Query Tool Dependencies
+
+# SQL Server (via ODBC)
+pyodbc>=4.0.0
+
+# Oracle Database
+oracledb>=1.0.0

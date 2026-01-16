@@ -1,0 +1,13 @@
+{
+  "databases": {
+    "sqlserver_budg": {
+      "type": "sqlserver",
+      "server": "p-budg-w-db19",
+      "port": 1433,
+      "database": "budg",
+      "authentication": "windows",
+      "description": "Budget SQL Server Database"
+    }
+  },
+  "default_database": "sqlserver_budg"
+}

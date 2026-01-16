@@ -1,0 +1,8 @@
+{
+  "budg_funding_sum": {
+    "query": "SELECT SUM(m.NetAmount) AS TotalNetAmount FROM eis.RD_REPORTING_2026 m WHERE m.BudgFy = '2026' AND m.fundingCode = '01002627DB'",
+    "database": "sqlserver_budg",
+    "created": "2026-01-16T00:00:00",
+    "description": "Sum of NetAmount for FY2026 with specific funding code"
+  }
+}
