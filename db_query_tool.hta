@@ -354,7 +354,7 @@ AND m.fundingCode = '01002627DB'</textarea>
             hideStatus();
             var query = document.getElementById('query').value;
 
-            if (!query.trim()) {
+            if (!query.replace(/^\s+|\s+$/g, '')) {
                 showStatus("Please enter a SQL query.", "error");
                 return;
             }
