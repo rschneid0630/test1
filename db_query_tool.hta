@@ -367,31 +367,32 @@ AND m.fundingCode = '01002627DB'</textarea>
                 conn.CommandTimeout = 300;
                 conn.Open(getConnectionString());
 
-                var rs = new ActiveXObject("ADODB.Recordset");
-                rs.Open(query, conn);
-
                 lastResults = [];
                 lastColumns = [];
 
-                // Get column names
-                if (!rs.EOF) {
+                // Execute query using Connection.Execute
+                var rs = conn.Execute(query);
+
+                // Check if we have a recordset with fields
+                if (rs && rs.Fields && rs.Fields.Count > 0) {
+                    // Get column names
                     for (var i = 0; i < rs.Fields.Count; i++) {
                         lastColumns.push(rs.Fields(i).Name);
                     }
-                }
 
-                // Get data
-                while (!rs.EOF) {
-                    var row = {};
-                    for (var i = 0; i < rs.Fields.Count; i++) {
-                        var val = rs.Fields(i).Value;
-                        row[rs.Fields(i).Name] = (val === null || val === undefined) ? null : val;
+                    // Get data
+                    while (!rs.EOF) {
+                        var row = {};
+                        for (var j = 0; j < rs.Fields.Count; j++) {
+                            var val = rs.Fields(j).Value;
+                            row[rs.Fields(j).Name] = (val === null || val === undefined) ? null : val;
+                        }
+                        lastResults.push(row);
+                        rs.MoveNext();
                     }
-                    lastResults.push(row);
-                    rs.MoveNext();
+                    rs.Close();
                 }
 
-                rs.Close();
                 conn.Close();
 
                 var endTime = new Date();
