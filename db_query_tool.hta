@@ -457,34 +457,43 @@ AND m.fundingCode = '01002627DB'</textarea>
             var headerEl = document.getElementById('resultsHeader');
             var bodyEl = document.getElementById('resultsBody');
 
-            headerEl.innerHTML = '';
-            bodyEl.innerHTML = '';
+            // Clear existing content using DOM methods
+            while (headerEl.firstChild) {
+                headerEl.removeChild(headerEl.firstChild);
+            }
+            while (bodyEl.firstChild) {
+                bodyEl.removeChild(bodyEl.firstChild);
+            }
 
             if (lastColumns.length === 0) {
-                bodyEl.innerHTML = '<tr><td>No results</td></tr>';
+                var emptyRow = document.createElement('tr');
+                var emptyCell = document.createElement('td');
+                emptyCell.innerText = 'No results';
+                emptyRow.appendChild(emptyCell);
+                bodyEl.appendChild(emptyRow);
                 return;
             }
 
-            // Header
-            var headerRow = '<tr>';
+            // Header row
+            var hRow = document.createElement('tr');
             for (var i = 0; i < lastColumns.length; i++) {
-                headerRow += '<th>' + escapeHtml(lastColumns[i]) + '</th>';
+                var th = document.createElement('th');
+                th.innerText = lastColumns[i];
+                hRow.appendChild(th);
             }
-            headerRow += '</tr>';
-            headerEl.innerHTML = headerRow;
+            headerEl.appendChild(hRow);
 
             // Data rows
-            var html = '';
             for (var r = 0; r < lastResults.length; r++) {
-                html += '<tr>';
+                var tr = document.createElement('tr');
                 for (var c = 0; c < lastColumns.length; c++) {
+                    var td = document.createElement('td');
                     var val = lastResults[r][lastColumns[c]];
-                    var displayVal = formatValue(val);
-                    html += '<td>' + escapeHtml(displayVal) + '</td>';
+                    td.innerText = formatValue(val);
+                    tr.appendChild(td);
                 }
-                html += '</tr>';
+                bodyEl.appendChild(tr);
             }
-            bodyEl.innerHTML = html;
         }
 
         function formatValue(val) {
@@ -492,9 +501,6 @@ AND m.fundingCode = '01002627DB'</textarea>
                 return 'NULL';
             }
             if (typeof val === 'number') {
-                if (Math.abs(val) >= 1000) {
-                    return val.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                }
                 return val.toString();
             }
             return val.toString();
