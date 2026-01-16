@@ -352,6 +352,7 @@ AND m.fundingCode = '01002627DB'</textarea>
 
         function executeQuery() {
             hideStatus();
+            var debugLog = [];
             var query = document.getElementById('query').value;
 
             if (!query.replace(/^\s+|\s+$/g, '')) {
@@ -360,50 +361,95 @@ AND m.fundingCode = '01002627DB'</textarea>
             }
 
             var startTime = new Date();
+            var conn = null;
+            var rs = null;
 
             try {
-                var conn = new ActiveXObject("ADODB.Connection");
+                debugLog.push("Step 1: Creating connection object...");
+                conn = new ActiveXObject("ADODB.Connection");
+
+                debugLog.push("Step 2: Setting timeouts...");
                 conn.ConnectionTimeout = 30;
                 conn.CommandTimeout = 300;
+
+                debugLog.push("Step 3: Opening connection...");
                 conn.Open(getConnectionString());
+                debugLog.push("Step 3: Connection opened successfully");
 
                 lastResults = [];
                 lastColumns = [];
 
-                // Execute query using Connection.Execute
-                var rs = conn.Execute(query);
+                debugLog.push("Step 4: Executing query...");
+                rs = conn.Execute(query);
+                debugLog.push("Step 4: Query executed");
 
-                // Check if we have a recordset with fields
-                if (rs && rs.Fields && rs.Fields.Count > 0) {
-                    // Get column names
-                    for (var i = 0; i < rs.Fields.Count; i++) {
-                        lastColumns.push(rs.Fields(i).Name);
-                    }
+                debugLog.push("Step 5: Checking recordset...");
+                if (rs) {
+                    debugLog.push("Step 5a: Recordset exists, State=" + rs.State);
 
-                    // Get data
-                    while (!rs.EOF) {
-                        var row = {};
-                        for (var j = 0; j < rs.Fields.Count; j++) {
-                            var val = rs.Fields(j).Value;
-                            row[rs.Fields(j).Name] = (val === null || val === undefined) ? null : val;
+                    // State 1 = open
+                    if (rs.State == 1) {
+                        debugLog.push("Step 5b: Recordset is open");
+
+                        var fieldCount = rs.Fields.Count;
+                        debugLog.push("Step 5c: Field count = " + fieldCount);
+
+                        if (fieldCount > 0) {
+                            // Get column names
+                            debugLog.push("Step 6: Getting column names...");
+                            for (var i = 0; i < fieldCount; i++) {
+                                lastColumns.push(rs.Fields(i).Name);
+                            }
+                            debugLog.push("Step 6: Columns = " + lastColumns.join(", "));
+
+                            // Get data
+                            debugLog.push("Step 7: Fetching rows...");
+                            var rowCount = 0;
+                            while (!rs.EOF) {
+                                var row = {};
+                                for (var j = 0; j < fieldCount; j++) {
+                                    var val = rs.Fields(j).Value;
+                                    row[rs.Fields(j).Name] = val;
+                                }
+                                lastResults.push(row);
+                                rowCount++;
+                                rs.MoveNext();
+                            }
+                            debugLog.push("Step 7: Fetched " + rowCount + " rows");
                         }
-                        lastResults.push(row);
-                        rs.MoveNext();
+
+                        debugLog.push("Step 8: Closing recordset...");
+                        rs.Close();
+                    } else {
+                        debugLog.push("Step 5b: Recordset not open (State=" + rs.State + ")");
                     }
-                    rs.Close();
+                } else {
+                    debugLog.push("Step 5: No recordset returned");
                 }
 
+                debugLog.push("Step 9: Closing connection...");
                 conn.Close();
 
                 var endTime = new Date();
                 var duration = (endTime - startTime) / 1000;
 
+                debugLog.push("Step 10: Displaying results...");
                 displayResults();
-                showStatus("Query executed successfully in " + duration.toFixed(2) + " seconds.", "success");
+
+                var msg = "SUCCESS in " + duration.toFixed(2) + "s. Rows: " + lastResults.length;
+                msg += "<br><br><b>Debug Log:</b><br>" + debugLog.join("<br>");
+                showStatus(msg, "success");
                 document.getElementById('summary').innerHTML = "Rows returned: " + lastResults.length;
 
             } catch (e) {
-                showStatus("Error: " + e.message, "error");
+                var errMsg = "ERROR at: " + debugLog[debugLog.length - 1];
+                errMsg += "<br><br><b>Error:</b> " + e.message;
+                errMsg += "<br><br><b>Debug Log:</b><br>" + debugLog.join("<br>");
+                showStatus(errMsg, "error");
+
+                // Try to clean up
+                try { if (rs) rs.Close(); } catch(ex) {}
+                try { if (conn) conn.Close(); } catch(ex) {}
             }
         }
 
