@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Database Query Tool v1.8</title>
+    <title>Database Query Tool v1.9</title>
     <HTA:APPLICATION
         ID="DBQueryTool"
         APPLICATIONNAME="Database Query Tool"
@@ -231,7 +231,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.8</span></h1>
+        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.9</span></h1>
 
         <!-- Database Selection -->
         <div class="panel">
@@ -706,7 +706,25 @@ AND m.fundingCode = '01002627DB'</textarea>
             if (typeof val === 'number') {
                 return val.toString();
             }
-            return val.toString();
+            // Handle VarDate and other COM date types
+            try {
+                // Check if it's a date-like object
+                if (typeof val === 'object' && val.getVarDate) {
+                    return new Date(val).toLocaleString();
+                }
+                if (val instanceof Date) {
+                    return val.toLocaleString();
+                }
+                // Try to convert to string safely
+                return String(val);
+            } catch (e) {
+                // If toString fails, try to get value another way
+                try {
+                    return new Date(val).toLocaleString();
+                } catch (e2) {
+                    return '[Date]';
+                }
+            }
         }
 
         function clearResults() {
