@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Database Query Tool v1.9</title>
+    <title>Database Query Tool v2.0</title>
     <HTA:APPLICATION
         ID="DBQueryTool"
         APPLICATIONNAME="Database Query Tool"
@@ -231,7 +231,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.9</span></h1>
+        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v2.0</span></h1>
 
         <!-- Database Selection -->
         <div class="panel">
@@ -240,7 +240,6 @@
                 <div id="tab-sqlserver" class="db-tab sqlserver active" onclick="selectDatabase('sqlserver')">SQL Server (Budg)</div>
                 <div id="tab-oracle" class="db-tab oracle" onclick="selectDatabase('oracle')">Oracle Fusion</div>
                 <div id="tab-sybase" class="db-tab sybase" onclick="selectDatabase('sybase')">Sybase</div>
-                <div id="tab-postgres" class="db-tab postgres" onclick="selectDatabase('postgres')">PostgreSQL</div>
             </div>
             <div class="conn-info" id="connInfo">SQL Server: p-budg-w-db19 / budg (Windows Auth)</div>
             <div id="authFields" class="row" style="display: none; margin-top: 15px;">
@@ -360,7 +359,7 @@ AND m.fundingCode = '01002627DB'</textarea>
             currentDatabase = dbKey;
 
             // Update tabs - use individual IDs instead of getElementsByClassName
-            var tabIds = ['tab-sqlserver', 'tab-oracle', 'tab-sybase', 'tab-postgres'];
+            var tabIds = ['tab-sqlserver', 'tab-oracle', 'tab-sybase'];
             for (var i = 0; i < tabIds.length; i++) {
                 var tab = document.getElementById(tabIds[i]);
                 if (tab) {
