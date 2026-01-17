@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Database Query Tool v2.0</title>
+    <title>Database Query Tool v2.1</title>
     <HTA:APPLICATION
         ID="DBQueryTool"
         APPLICATIONNAME="Database Query Tool"
@@ -231,7 +231,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v2.0</span></h1>
+        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v2.1</span></h1>
 
         <!-- Database Selection -->
         <div class="panel">
@@ -352,7 +352,92 @@ AND m.fundingCode = '01002627DB'</textarea>
             'postgres': {}
         };
 
-        // Initialize
+        // Get the path for saved queries file (same folder as HTA)
+        function getSavedQueriesPath() {
+            var path = location.pathname;
+            // Remove leading slash on Windows paths like /C:/...
+            if (path.charAt(0) === '/' && path.charAt(2) === ':') {
+                path = path.substring(1);
+            }
+            // Decode URL encoding
+            path = decodeURIComponent(path);
+            // Replace the filename with our config file
+            var lastSlash = path.lastIndexOf('/');
+            if (lastSlash === -1) lastSlash = path.lastIndexOf('\\');
+            var folder = path.substring(0, lastSlash + 1);
+            return folder + 'saved_queries.json';
+        }
+
+        // Load saved queries from file
+        function loadSavedQueries() {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var filePath = getSavedQueriesPath();
+                if (fso.FileExists(filePath)) {
+                    var file = fso.OpenTextFile(filePath, 1); // 1 = ForReading
+                    var content = file.ReadAll();
+                    file.Close();
+                    var loaded = eval('(' + content + ')');
+                    // Merge with defaults (keep defaults if not in file)
+                    for (var db in loaded) {
+                        if (loaded.hasOwnProperty(db)) {
+                            if (!savedQueries[db]) savedQueries[db] = {};
+                            for (var name in loaded[db]) {
+                                if (loaded[db].hasOwnProperty(name)) {
+                                    savedQueries[db][name] = loaded[db][name];
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                // File doesn't exist or can't be read - use defaults
+            }
+        }
+
+        // Save queries to file
+        function saveSavedQueries() {
+            try {
+                var fso = new ActiveXObject("Scripting.FileSystemObject");
+                var filePath = getSavedQueriesPath();
+                var file = fso.CreateTextFile(filePath, true); // true = overwrite
+
+                // Simple JSON stringify (JScript doesn't have JSON.stringify)
+                var json = '{\n';
+                var dbFirst = true;
+                for (var db in savedQueries) {
+                    if (savedQueries.hasOwnProperty(db)) {
+                        if (!dbFirst) json += ',\n';
+                        dbFirst = false;
+                        json += '  "' + db + '": {\n';
+                        var qFirst = true;
+                        for (var name in savedQueries[db]) {
+                            if (savedQueries[db].hasOwnProperty(name)) {
+                                if (!qFirst) json += ',\n';
+                                qFirst = false;
+                                var q = savedQueries[db][name];
+                                var sql = q.sql || q;
+                                var desc = q.description || '';
+                                // Escape special characters in strings
+                                sql = sql.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                                desc = desc.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+                                json += '    "' + name + '": {"sql": "' + sql + '", "description": "' + desc + '"}';
+                            }
+                        }
+                        json += '\n  }';
+                    }
+                }
+                json += '\n}';
+
+                file.Write(json);
+                file.Close();
+            } catch (e) {
+                showStatus("Failed to save queries: " + e.message, "error");
+            }
+        }
+
+        // Initialize - load saved queries first
+        loadSavedQueries();
         updateSavedQueriesUI();
 
         function selectDatabase(dbKey) {
@@ -459,6 +544,9 @@ AND m.fundingCode = '01002627DB'</textarea>
                 sql: query,
                 description: desc
             };
+
+            // Save to file for persistence
+            saveSavedQueries();
 
             updateSavedQueriesUI();
             closeSaveModal();
