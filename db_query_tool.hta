@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Database Query Tool v1.4</title>
+    <title>Database Query Tool v1.5</title>
     <HTA:APPLICATION
         ID="DBQueryTool"
         APPLICATIONNAME="Database Query Tool"
@@ -169,7 +169,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.4</span></h1>
+        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.5</span></h1>
 
         <!-- Database Selection -->
         <div class="panel">
@@ -181,6 +181,16 @@
                 <div id="tab-postgres" class="db-tab postgres" onclick="selectDatabase('postgres')">PostgreSQL</div>
             </div>
             <div class="conn-info" id="connInfo">SQL Server: p-budg-w-db19 / budg (Windows Auth)</div>
+            <div id="authFields" class="row" style="display: none; margin-top: 15px;">
+                <div>
+                    <label>Username:</label>
+                    <input type="text" id="dbUsername" value="" />
+                </div>
+                <div>
+                    <label>Password:</label>
+                    <input type="password" id="dbPassword" value="" />
+                </div>
+            </div>
             <button onclick="testConnection()" class="success">Test Connection</button>
         </div>
 
@@ -240,25 +250,31 @@ AND m.fundingCode = '01002627DB'</textarea>
                 name: 'SQL Server (Budg)',
                 type: 'oledb',
                 connString: 'Provider=SQLOLEDB;Data Source=p-budg-w-db19,1433;Initial Catalog=budg;Integrated Security=SSPI;',
-                info: 'SQL Server: p-budg-w-db19 / budg (Windows Auth)'
+                info: 'SQL Server: p-budg-w-db19 / budg (Windows Auth)',
+                needsAuth: false
             },
             'oracle': {
                 name: 'Oracle Fusion',
                 type: 'odbc',
                 connString: 'Provider=MSDASQL;DSN=BIPRODOAS;',
-                info: 'Oracle Fusion: BIPRODOAS (ODBC DSN)'
+                info: 'Oracle Fusion: BIPRODOAS (ODBC DSN)',
+                needsAuth: false
             },
             'sybase': {
                 name: 'Sybase',
                 type: 'odbc',
                 connString: 'Provider=MSDASQL;DSN=RPTSERVER;',
-                info: 'Sybase: RPTSERVER / rptdb (ODBC DSN)'
+                info: 'Sybase: RPTSERVER / rptdb (ODBC DSN)',
+                needsAuth: true,
+                defaultUser: 'sa'
             },
             'postgres': {
                 name: 'PostgreSQL',
                 type: 'odbc',
                 connString: 'Provider=MSDASQL;DSN=PostgreSQL35W;',
-                info: 'PostgreSQL: PostgreSQL35W (ODBC DSN)'
+                info: 'PostgreSQL: PostgreSQL35W (ODBC DSN)',
+                needsAuth: true,
+                defaultUser: ''
             }
         };
 
@@ -299,6 +315,17 @@ AND m.fundingCode = '01002627DB'</textarea>
 
             // Update saved queries
             updateSavedQueriesUI();
+
+            // Show/hide auth fields
+            var authFields = document.getElementById('authFields');
+            var db = databases[dbKey];
+            if (db.needsAuth) {
+                authFields.style.display = 'flex';
+                document.getElementById('dbUsername').value = db.defaultUser || '';
+                document.getElementById('dbPassword').value = '';
+            } else {
+                authFields.style.display = 'none';
+            }
         }
 
         function updateSavedQueriesUI() {
@@ -344,7 +371,17 @@ AND m.fundingCode = '01002627DB'</textarea>
         }
 
         function getConnectionString() {
-            return databases[currentDatabase].connString;
+            var db = databases[currentDatabase];
+            var connStr = db.connString;
+
+            // Add credentials if needed
+            if (db.needsAuth) {
+                var username = document.getElementById('dbUsername').value;
+                var password = document.getElementById('dbPassword').value;
+                connStr += 'UID=' + username + ';PWD=' + password + ';';
+            }
+
+            return connStr;
         }
 
         function showStatus(message, type) {
