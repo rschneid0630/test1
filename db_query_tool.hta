@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Database Query Tool v1.1</title>
+    <title>Database Query Tool v1.2</title>
     <HTA:APPLICATION
         ID="DBQueryTool"
         APPLICATIONNAME="Database Query Tool"
@@ -217,7 +217,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.1</span></h1>
+        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.2</span></h1>
 
         <div class="panel">
             <h2>Connection Settings</h2>
@@ -271,6 +271,9 @@ AND m.fundingCode = '01002627DB'</textarea>
             <button onclick="executeQuery()">Execute Query</button>
             <button onclick="clearResults()" class="secondary">Clear Results</button>
             <button onclick="exportCSV()" class="secondary">Export to CSV</button>
+            <label style="margin-left: 20px; display: inline-flex; align-items: center; font-weight: normal;">
+                <input type="checkbox" id="debugMode" style="margin-right: 5px; width: auto;"> Debug Mode
+            </label>
         </div>
 
         <div id="statusMessage" class="status"></div>
@@ -437,7 +440,9 @@ AND m.fundingCode = '01002627DB'</textarea>
                 displayResults();
 
                 var msg = "SUCCESS in " + duration.toFixed(2) + "s. Rows: " + lastResults.length;
-                msg += "<br><br><b>Debug Log:</b><br>" + debugLog.join("<br>");
+                if (document.getElementById('debugMode').checked) {
+                    msg += "<br><br><b>Debug Log:</b><br>" + debugLog.join("<br>");
+                }
                 showStatus(msg, "success");
                 document.getElementById('summary').innerHTML = "Rows returned: " + lastResults.length;
 
