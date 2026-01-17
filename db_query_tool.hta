@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Database Query Tool v1.5</title>
+    <title>Database Query Tool v1.6</title>
     <HTA:APPLICATION
         ID="DBQueryTool"
         APPLICATIONNAME="Database Query Tool"
@@ -165,11 +165,58 @@
         }
         .selected-row-info.visible { display: block; }
         .conn-info { font-size: 12px; color: #666; margin-top: 5px; }
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-overlay.visible { display: flex; justify-content: center; align-items: center; }
+        .modal {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .modal h3 { margin-top: 0; color: #0078d4; }
+        .modal label { display: block; margin-bottom: 5px; font-weight: 600; }
+        .modal input, .modal textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        .modal textarea { min-height: 80px; font-family: inherit; }
+        .modal-buttons { text-align: right; margin-top: 15px; }
+        .saved-query-btn { position: relative; }
+        .saved-query-btn[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            white-space: nowrap;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.5</span></h1>
+        <h1>Database Query Tool <span style="font-size: 14px; color: #666; font-weight: normal;">v1.6</span></h1>
 
         <!-- Database Selection -->
         <div class="panel">
@@ -278,10 +325,13 @@ AND m.fundingCode = '01002627DB'</textarea>
             }
         };
 
-        // Saved queries organized by database
+        // Saved queries organized by database - each query has {sql, description}
         var savedQueries = {
             'sqlserver': {
-                'Budget FY2026 Sum': "SELECT SUM(m.NetAmount) AS TotalNetAmount\nFROM eis.RD_REPORTING_2026 m\nWHERE m.BudgFy = '2026'\nAND m.fundingCode = '01002627DB'"
+                'Budget FY2026 Sum': {
+                    sql: "SELECT SUM(m.NetAmount) AS TotalNetAmount\nFROM eis.RD_REPORTING_2026 m\nWHERE m.BudgFy = '2026'\nAND m.fundingCode = '01002627DB'",
+                    description: "Sum of NetAmount for FY2026 funding code 01002627DB"
+                }
             },
             'oracle': {},
             'sybase': {},
@@ -337,12 +387,19 @@ AND m.fundingCode = '01002627DB'</textarea>
             var queries = savedQueries[currentDatabase];
             for (var name in queries) {
                 if (queries.hasOwnProperty(name)) {
+                    var queryObj = queries[name];
+                    var sql = typeof queryObj === 'string' ? queryObj : queryObj.sql;
+                    var desc = typeof queryObj === 'object' ? queryObj.description : '';
+
                     var btn = document.createElement('button');
                     btn.className = 'saved-query-btn';
                     btn.innerText = name;
-                    btn.onclick = (function(q) {
-                        return function() { document.getElementById('query').value = q; };
-                    })(queries[name]);
+                    if (desc) {
+                        btn.title = desc;
+                    }
+                    btn.onclick = (function(s) {
+                        return function() { document.getElementById('query').value = s; };
+                    })(sql);
                     container.appendChild(btn);
                 }
             }
@@ -362,12 +419,36 @@ AND m.fundingCode = '01002627DB'</textarea>
                 showStatus('No query to save.', 'error');
                 return;
             }
-            var name = prompt('Enter a name for this query:');
-            if (name) {
-                savedQueries[currentDatabase][name] = query;
-                updateSavedQueriesUI();
-                showStatus('Query saved as "' + name + '"', 'success');
+            // Show the modal
+            document.getElementById('queryName').value = '';
+            document.getElementById('queryDesc').value = '';
+            document.getElementById('queryDb').value = databases[currentDatabase].name;
+            document.getElementById('queryPreview').value = query;
+            document.getElementById('saveModal').className = 'modal-overlay visible';
+        }
+
+        function closeSaveModal() {
+            document.getElementById('saveModal').className = 'modal-overlay';
+        }
+
+        function confirmSaveQuery() {
+            var name = document.getElementById('queryName').value;
+            var desc = document.getElementById('queryDesc').value;
+            var query = document.getElementById('queryPreview').value;
+
+            if (!name.replace(/^\s+|\s+$/g, '')) {
+                alert('Please enter a query name.');
+                return;
             }
+
+            savedQueries[currentDatabase][name] = {
+                sql: query,
+                description: desc
+            };
+
+            updateSavedQueriesUI();
+            closeSaveModal();
+            showStatus('Query saved as "' + name + '"', 'success');
         }
 
         function getConnectionString() {
@@ -668,5 +749,24 @@ AND m.fundingCode = '01002627DB'</textarea>
             }
         }
     </script>
+
+    <!-- Save Query Modal -->
+    <div class="modal-overlay" id="saveModal">
+        <div class="modal">
+            <h3>Save Query</h3>
+            <label>Query Name:</label>
+            <input type="text" id="queryName" placeholder="e.g., sybaseq1ForBudg" />
+            <label>Description:</label>
+            <textarea id="queryDesc" placeholder="Brief description of what this query does..."></textarea>
+            <label>Database:</label>
+            <input type="text" id="queryDb" readonly style="background: #f0f0f0;" />
+            <label>SQL Preview:</label>
+            <textarea id="queryPreview" readonly style="background: #f0f0f0; font-family: Consolas, monospace; font-size: 12px;"></textarea>
+            <div class="modal-buttons">
+                <button onclick="closeSaveModal()" class="secondary">Cancel</button>
+                <button onclick="confirmSaveQuery()">Save Query</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
